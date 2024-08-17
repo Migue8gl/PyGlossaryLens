@@ -1,8 +1,7 @@
 import cv2
 from deskew import determine_skew
 from easyocr import Reader
-from utils.preprocess_frame import draw_boxes, rotate, binarize
-from utils.geometry_utils import compute_rectangle_given_center
+from utils.preprocess_utils import draw_boxes, rotate, binarize, rotate_point
 import warnings
 
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -15,18 +14,50 @@ def extract_text(data: dict[str, str]):
     return "".join(text_list)
 
 
-def show_frame(frame):
-    width, height = 0.2, 0.1
+def handle_frame(frame, reader):
+    global MOUSE_X, MOUSE_Y
+    width, height = int(frame.shape[1] * 0.9), int((frame.shape[1] * 0.9) // 2)
+    results = None
+    word_finded = False
+    final_word = None
+    decrease_factor = 0.05  # Increase size by 5% each iteration
+
     while True:
-        cv2.imshow("Frame", frame)
         cv2.setMouseCallback("Frame", click_event)
 
         if MOUSE_X is not None and MOUSE_Y is not None:
-            vertices = compute_rectangle_given_center(
-                MOUSE_X, MOUSE_Y, width, height
-            )
+            while not word_finded:
+                # Ensure cropping does not go out of bounds
+                start_x = max(0, MOUSE_X - width // 2)
+                start_y = max(0, MOUSE_Y - height // 2)
+                end_x = min(frame.shape[1], start_x + width)
+                end_y = min(frame.shape[0], start_y + height)
+
+                # Crop the frame
+                crop_frame = frame[start_y:end_y, start_x:end_x]
+
+                cv2.imshow("Frame", crop_frame)
+                results = reader.readtext(crop_frame)
+
+                if len(results) == 1:
+                    words = results[0][1]
+                    final_word = words.replace(",", " ").split()
+                    print(final_word)
+                    if len(final_word) == 1:
+                        word_finded = True
+
+                # Increase size proportionally
+                width = int(width * (1 - decrease_factor))
+                height = int(height * (1 - decrease_factor))
+
+                # Ensure size does not become too small
+                if width <= 0 or height <= 0:
+                    break
+
+                print(height, width)
 
         if cv2.waitKey(1) == ord("q"):
+            MOUSE_X, MOUSE_Y = None, None
             break
 
 
@@ -56,10 +87,6 @@ def start_video():
 
         # Character "a" for detect words
         if key == ord("a"):
-            angle = determine_skew(frame)
-            transformed_frame = binarize(frame)
-            transformed_frame = rotate(transformed_frame, angle, (0, 0, 0))
-
             # Use EasyOCR to extract text
             results = reader.readtext(frame)
 
@@ -74,13 +101,13 @@ def start_video():
                     file.write(text.strip())
 
                 # Draw bounding boxes on the frame and correct angle
-                frame_with_boxes = draw_boxes(frame, results, angle)
+                # frame_with_boxes = draw_boxes(frame, results, angle)
 
-                show_frame(frame_with_boxes)
+                handle_frame(frame, reader)
         elif key == ord("q"):
             break
 
-        cv2.imshow("Frame", frame_with_boxes)
+        cv2.imshow("Frame", frame)
 
     cap.release()
     cv2.destroyAllWindows()

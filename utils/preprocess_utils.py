@@ -41,6 +41,32 @@ def rotate(
     )
 
 
+def rotate_point(x, y, w, h, angle_degrees):
+    # Convert angle from degrees to radians
+    angle_radians = math.radians(angle_degrees)
+
+    # Center of the image
+    cx, cy = w / 2, h / 2
+
+    # Translate point to origin (center of image)
+    x_translated = x - cx
+    y_translated = y - cy
+
+    # Apply rotation
+    x_rotated = x_translated * math.cos(
+        angle_radians
+    ) - y_translated * math.sin(angle_radians)
+    y_rotated = x_translated * math.sin(
+        angle_radians
+    ) + y_translated * math.cos(angle_radians)
+
+    # Translate point back
+    x_new = x_rotated + cx
+    y_new = y_rotated + cy
+
+    return int(x_new), int(y_new)
+
+
 def binarize(image: np.ndarray) -> np.ndarray:
     """
     Convert an image to binary (black and white) using adaptive thresholding.
