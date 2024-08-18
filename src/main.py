@@ -1,9 +1,9 @@
 import cv2
-from deskew import determine_skew
-from easyocr import Reader
-from utils.preprocess_utils import draw_boxes, rotate, binarize, rotate_point
 import warnings
+from ocr_engine import OcrEngine
+import enchant
 
+dictionary = enchant.Dict("es")
 warnings.filterwarnings("ignore", category=FutureWarning)
 MOUSE_X, MOUSE_Y = None, None
 
@@ -14,7 +14,7 @@ def extract_text(data: dict[str, str]):
     return "".join(text_list)
 
 
-def handle_frame(frame, reader):
+def handle_frame(frame, ocr):
     global MOUSE_X, MOUSE_Y
     width, height = int(frame.shape[1] * 0.9), int((frame.shape[1] * 0.9) // 2)
     results = None
@@ -37,7 +37,7 @@ def handle_frame(frame, reader):
                 crop_frame = frame[start_y:end_y, start_x:end_x]
 
                 cv2.imshow("Frame", crop_frame)
-                results = reader.readtext(crop_frame)
+                results = ocr.inference(crop_frame)
 
                 if len(results) == 1:
                     words = results[0][1]
@@ -71,7 +71,7 @@ def click_event(event, x, y, flags, params):
 
 def start_video():
     cap = cv2.VideoCapture(0)
-    reader = Reader(["es"], gpu=False, verbose=False)
+    ocr = OcrEngine()
 
     while True:
         ret, frame = cap.read()
@@ -79,31 +79,12 @@ def start_video():
         if not ret:
             break
 
-        # Frame with boxes surrounding words detected
-        frame_with_boxes = frame
-
         # Key for action
         key = cv2.waitKey(1)
 
         # Character "a" for detect words
         if key == ord("a"):
-            # Use EasyOCR to extract text
-            results = reader.readtext(frame)
-
-            if results and isinstance(results, list):
-                text = ""
-
-                for result in results:
-                    # Concatenate text with space
-                    if len(result) > 0:
-                        text += result[1] + " "
-                with open("files/extracted_text.txt", "w") as file:
-                    file.write(text.strip())
-
-                # Draw bounding boxes on the frame and correct angle
-                # frame_with_boxes = draw_boxes(frame, results, angle)
-
-                handle_frame(frame, reader)
+            handle_frame(frame, ocr)
         elif key == ord("q"):
             break
 
