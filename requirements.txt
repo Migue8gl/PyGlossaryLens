@@ -1,3 +1,3 @@
-easyocr==1.7.1
-mmocr==1.0.1
-numpy==2.0.1
+easyocr
+mmocr
+numpy
