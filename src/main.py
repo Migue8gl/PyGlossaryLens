@@ -1,17 +1,24 @@
 import cv2
 import warnings
-from ocr_engine import OcrEngine
+from src.ocr_engine import OcrEngine
 import enchant
+from utils.preprocess_utils import draw_boxes
 
-dictionary = enchant.Dict("es")
 warnings.filterwarnings("ignore", category=FutureWarning)
 MOUSE_X, MOUSE_Y = None, None
 
 
-def extract_text(data: dict[str, str]):
-    text = data["text"]
-    text_list = list(map(lambda x: " " if x == "" else x, text))
-    return "".join(text_list)
+def check_word(word: str, language: str = "es"):
+    dictionary = enchant.Dict(language)
+    return dictionary.check(word)
+
+
+def adjust_bounding_boxes(results, start_x, start_y):
+    for result in results:
+        bbox = result["bbox"]
+        adjusted_bbox = [[x + start_x, y + start_y] for x, y in bbox]
+        result["bbox"] = adjusted_bbox
+    return results
 
 
 def handle_frame(frame, ocr):
@@ -19,11 +26,19 @@ def handle_frame(frame, ocr):
     width, height = int(frame.shape[1] * 0.9), int((frame.shape[1] * 0.9) // 2)
     results = None
     word_finded = False
-    final_word = None
+    final_word, final_results = None, None
     decrease_factor = 0.05  # Increase size by 5% each iteration
 
     while True:
         cv2.setMouseCallback("Frame", click_event)
+        if word_finded:
+            # Draw adjusted bounding boxes on the original frame
+            cv2.imshow(
+                "Frame",
+                draw_boxes(image=frame, detections=results),
+            )
+        else:
+            cv2.imshow("Frame", frame)
 
         if MOUSE_X is not None and MOUSE_Y is not None:
             while not word_finded:
@@ -35,15 +50,19 @@ def handle_frame(frame, ocr):
 
                 # Crop the frame
                 crop_frame = frame[start_y:end_y, start_x:end_x]
-
-                cv2.imshow("Frame", crop_frame)
                 results = ocr.inference(crop_frame)
 
                 if len(results) == 1:
-                    words = results[0][1]
+                    words = results[0]["text"]
                     final_word = words.replace(",", " ").split()
-                    print(final_word)
                     if len(final_word) == 1:
+                        print(final_word[0])
+                        check_word(final_word[0])
+                        # Adjust bounding boxes to original frame
+                        results = adjust_bounding_boxes(
+                            results, start_x, start_y
+                        )
+                        final_results = results
                         word_finded = True
 
                 # Increase size proportionally

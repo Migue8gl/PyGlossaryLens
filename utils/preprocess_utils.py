@@ -181,7 +181,7 @@ def rotated_rectangle(
 
 
 def draw_boxes(
-    image: np.ndarray, detections: list, angle: float, threshold: float = 0.1
+    image: np.ndarray, detections: list, threshold: float = 0.5
 ) -> np.ndarray:
     """
     Draw bounding boxes on an image based on detections.
@@ -189,20 +189,18 @@ def draw_boxes(
     Args:
         image (np.ndarray): Input image to draw on.
         detections (list): List of detections, each containing bounding box coordinates and score.
-        angle (float): Rotation angle for the rectangles.
         threshold (float): Confidence threshold for drawing boxes. Default is 0.1.
 
     Returns:
         np.ndarray: Image with drawn bounding boxes.
     """
-    for bbox, _, score in detections:
-        if score > threshold:
-            rotated_rectangle(
+    for detection in detections:
+        if detection["confidence"] > threshold:
+            cv2.rectangle(
                 image,
-                tuple(map(int, bbox[0])),
-                tuple(map(int, bbox[2])),
+                tuple(map(int, detection["bbox"][0])),
+                tuple(map(int, detection["bbox"][2])),
                 (0, 255, 0),
                 2,
-                angle,
             )
     return image
